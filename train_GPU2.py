@@ -3,7 +3,11 @@ from torch import nn
 from model import *
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-# 准备训练集和测试集
+import time
+# 指定训练设备
+# device=torch.device("cuda:0")
+device=torch.device("cpu")
+print(device)
 train_data = torchvision.datasets.CIFAR10(
     root="../data",
     train=True,
@@ -28,9 +32,12 @@ test_dataloader = DataLoader(test_data, batch_size=64)
 
 # 创建网络模型
 test = Test()
+test = test.to(device)
 
 # 创建损失函数
 loss_fn = nn.CrossEntropyLoss()
+loss_fn = loss_fn.to(device)
+
 # 定义优化器,随机梯度下降
 # lr是learning_rate
 optimizer = torch.optim.SGD(
@@ -38,20 +45,20 @@ optimizer = torch.optim.SGD(
     lr=0.01,
 )
 
-# 设置训练网络的一些参数
-# 记录训练的次数
 total_train_step = 0
-# 记录测试的次数
 total_test_step = 0
-# 训练的轮数
 epoch = 10
 writer=SummaryWriter("./logs_model_train")
+start_time=time.time()
 for i in range(epoch):
     print("第{}轮训练".format(i + 1))
     # 训练步骤开始
+    # .cuda() 将参数从 CPU 内存复制到 GPU 内存中，以便并行计算
     test.train()
     for data in train_dataloader:
         imgs, targets = data
+        imgs=imgs.to(device)
+        targets=targets.to(device)
         output = test(imgs)
         loss = loss_fn(output, targets)
         # 优化器调优
@@ -62,6 +69,7 @@ for i in range(epoch):
         if total_train_step%100==0:
             print("训练次数：{},loss:{}".format(total_train_step, loss.item()))
             writer.add_scalar("train_loss",loss.item(),total_train_step)
+      
     # 测试步骤开始
     test.eval()
     total_test_loss=0
@@ -69,6 +77,8 @@ for i in range(epoch):
     with torch.no_grad():
         for data in test_dataloader:
             imgs,targets=data
+            imgs=imgs.to(device)
+            targets=targets.to(device)
             outputs=test(imgs)
             loss=loss_fn(outputs,targets)
             total_test_loss=total_test_loss+loss.item()
@@ -80,5 +90,7 @@ for i in range(epoch):
     writer.add_scalar("total_test_accuracy",total_test_accuracy,total_test_step)
     total_test_step=total_test_step+1 
     torch.save(test,"test_{}.pth".format(i))
+    end_time=time.time()
+    print("consumption of time:{}".format(end_time-start_time))   
 writer.close()                    
             
